@@ -16,8 +16,12 @@ module m_RF2 (
     always @(posedge w_clk) begin
         if (w_we) mem[w_wa] <= w_wd;
     end
+    // 合成時は終了処理を除外する。LED表示のシミュレーションでも
+    // SYNTHESISを定義すると、結果を観測するまで実行を継続できる。
+`ifndef SYNTHESIS
     always @(posedge w_clk) begin
         if (w_we & w_wa==5'd30) $finish;
     end
+`endif
     integer i; initial for (i=0; i<32; i=i+1) mem[i] = 0;
 endmodule

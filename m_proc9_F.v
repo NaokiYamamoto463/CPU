@@ -1,6 +1,6 @@
 module m_proc9_F (
     input wire w_clk,
-    output reg [31:0] r_dout
+    output reg [31:0] r_dout = 32'd0
 );
     reg [31:0] P1_ir=32'h13, P1_pc=0, P2_pc=0, P3_pc=0, P4_pc=0;
     reg [31:0] P2_r1=0, P2_s2=0, P2_r2=0, P2_tpc=0, P3_r2=0;
@@ -19,7 +19,9 @@ module m_proc9_F (
     wire [2:0] w_func;
     assign w_func = (w_ld | w_s) ? 3'b000 : P1_ir[14:12];
     always @(posedge w_clk) begin
-        r_dout <= (!P3_s & !P3_b & P3_v & P3_rd==30) ? w_rt : r_dout;
+        // 書き戻しデータw_rtと同じP4段でx30への書き込みを判定する。
+        if (!P4_s && !P4_b && P4_v && P4_rd == 5'd30)
+            r_dout <= w_rt;
     end
     //IF stage------------------------------------------
     m_mux m0 (.w_in1 (w_npc), .w_in2 (P2_tpc), .w_s (w_miss), .w_out (w_pcin));
