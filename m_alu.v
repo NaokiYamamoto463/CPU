@@ -5,9 +5,14 @@ module m_alu (
     output wire [31:0] w_out,
     output wire w_tkn
 );
-    assign w_out = (w_func == 3'b000) ? w_in1 + w_in2 :
-                   (w_func == 3'b001) ? w_in1 - w_in2 :
-                                        w_in1 & w_in2;
-    // assign w_out = w_in1 + w_in2;
+
+    assign w_out =  (w_func == 3'b000) ? w_in1 + w_in2 :
+                    (w_func == 3'b001) ? w_in1 - w_in2 :
+                    (w_func == 3'b100) ? w_in1 ^ w_in2 :
+                    (w_func == 3'b110) ? w_in1 | w_in2 :
+                    (w_func == 3'b111) ? w_in1 & w_in2 :
+                                        32'd0;
+
     assign w_tkn = w_in1 != w_in2;
+
 endmodule
