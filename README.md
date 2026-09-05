@@ -13,19 +13,21 @@ Verilog HDLで記述した、32ビットのパイプラインCPUです。RISC-V�
 
 ## ファイル構成
 
+Verilogソース（`.v`）は`scr/`にまとめています。`asm.vh`はリポジトリ直下、テストベンチは`tests/`にあります。Vivadoでは`scr/`内のソースを追加し、リポジトリ直下をインクルード検索先に設定してください。
+
 | ファイル | 役割 |
 | --- | --- |
-| `m_main.v` | トップモジュール。CPU、VIO、16ビットのLED出力を接続 |
-| `m_proc9_F.v` | CPU本体。パイプライン制御と各モジュールの接続 |
-| `m_RF2.v` | レジスタファイルと書き込みデータのバイパス |
-| `m_alu.v` | 算術・論理演算と分岐条件の判定 |
-| `m_adder.v` | PC更新や分岐先計算に使う32ビット加算器 |
-| `m_mux.v` | 32ビットの2入力マルチプレクサ |
-| `m_get_type.v` | オペコードに基づく命令形式の判定 |
-| `m_get_imm.v` | 命令からの即値生成 |
-| `m_gen_imm.v` | 命令形式の判定と即値生成をまとめ、ロード命令を識別 |
-| `m_am_imem.v` | 命令メモリ。`asm.vh`からプログラムを設定 |
-| `m_am_dmem.v` | データメモリ。非同期読み出し・クロック同期書き込み |
+| `scr/m_main.v` | トップモジュール。CPU、VIO、16ビットのLED出力を接続 |
+| `scr/m_proc9_F.v` | CPU本体。パイプライン制御と各モジュールの接続 |
+| `scr/m_RF2.v` | レジスタファイルと書き込みデータのバイパス |
+| `scr/m_alu.v` | 算術・論理演算と分岐条件の判定 |
+| `scr/m_adder.v` | PC更新や分岐先計算に使う32ビット加算器 |
+| `scr/m_mux.v` | 32ビットの2入力マルチプレクサ |
+| `scr/m_get_type.v` | オペコードに基づく命令形式の判定 |
+| `scr/m_get_imm.v` | 命令からの即値生成 |
+| `scr/m_gen_imm.v` | 命令形式の判定と即値生成をまとめ、ロード命令を識別 |
+| `scr/m_am_imem.v` | 命令メモリ。`asm.vh`からプログラムを設定 |
+| `scr/m_am_dmem.v` | データメモリ。非同期読み出し・クロック同期書き込み |
 | `asm.vh` | 命令メモリに格納するサンプルプログラム |
 | `nexys_a7.xdc` | Nexys A7用の100 MHzクロック・16個のLEDのピン制約 |
 | `tests/tb_main_led.sv` | CPUからLEDまでの出力を確認するシミュレーション用テストベンチ |
@@ -49,7 +51,7 @@ x30 = x10
 
 計算結果は **5050（0x000013BA）** です。Icarus Verilogのシミュレーションで、LED出力が`16'h13BA`になり、プログラムの再実行中も表示が維持されることを確認しています。実機での表示と100 MHz動作のタイミング検証は未実施です。
 
-末尾の`HALT`というコメントは、`addi x30, x10, 0`を終了の目印として使うことを表しています。`m_RF2.v`は`x30`への書き込み時に`$finish`を呼び出してシミュレーションを終了します。
+末尾の`HALT`というコメントは、`addi x30, x10, 0`を終了の目印として使うことを表しています。`scr/m_RF2.v`は`x30`への書き込み時に`$finish`を呼び出してシミュレーションを終了します。
 
 プログラムを変更する場合は、`asm.vh`の各`MM`要素に格納する命令語を編集します。
 
@@ -57,14 +59,14 @@ x30 = x10
 
 ### CPU単体のシミュレーション
 
-`m_proc9_F`を呼び出してクロックを供給するテストベンチを用意し、CPU本体と依存する各`.v`ファイルを読み込みます。`asm.vh`はインクルードファイルとして参照できるようにしてください。CPU単体の確認では、VIOを参照する`m_main.v`は不要です。
+`m_proc9_F`を呼び出してクロックを供給するテストベンチを用意し、CPU本体と依存する各`.v`ファイルを読み込みます。`asm.vh`はインクルードファイルとして参照できるようにしてください。CPU単体の確認では、VIOを参照する`scr/m_main.v`は不要です。
 
 ### LED出力のシミュレーション
 
 Icarus Verilogを使用する場合は、このフォルダーで次を実行します。実行ファイルのパスはインストール先に合わせてください。
 
 ```powershell
-$cpuSources = (Get-ChildItem -File *.v).FullName
+$cpuSources = (Get-ChildItem -Path scr -File -Filter *.v).FullName
 $ledSimPath = Join-Path $env:TEMP 'cpu_led.vvp'
 & C:\iverilog\bin\iverilog.exe -g2012 -DSYNTHESIS -s tb_main_led -I . -o $ledSimPath tests/tb_main_led.sv $cpuSources
 if ($LASTEXITCODE -eq 0) { & C:\iverilog\bin\vvp.exe $ledSimPath }
