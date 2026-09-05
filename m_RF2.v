@@ -8,9 +8,12 @@ module m_RF2 (
     input wire w_we,
     input wire [31:0] w_wd 
 );
+    // 32ビット×32本のレジスタ
     reg [31:0] mem [31:0];
+    // 読み書き先が同じ場合は、書き込みデータを直接読み出す
     wire w_bp1 = (w_we & w_ra1 == w_wa);
     wire w_bp2 = (w_we & w_ra2 == w_wa);
+    // x0の読み出し値は常に0
     assign w_rd1 = (w_ra1==5'd0) ? 32'd0 : (w_bp1) ? w_wd : mem[w_ra1];
     assign w_rd2 = (w_ra2==5'd0) ? 32'd0 : (w_bp2) ? w_wd : mem[w_ra2];
     always @(posedge w_clk) begin

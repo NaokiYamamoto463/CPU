@@ -2,6 +2,7 @@ module m_proc9_F (
     input wire w_clk,
     output reg [31:0] r_dout = 32'd0
 );
+    // 各パイプライン段で命令・データ・制御信号を保持する
     reg [31:0] P1_ir=32'h13, P1_pc=0, P2_pc=0, P3_pc=0, P4_pc=0;
     reg [31:0] P2_r1=0, P2_s2=0, P2_r2=0, P2_tpc=0, P3_r2=0;
     reg [31:0] P3_alu, P3_in3, P4_alu=0, P4_ldd=0;
@@ -13,6 +14,7 @@ module m_proc9_F (
     wire [31:0] w_alu, w_ldd, w_tpc, w_pcin, w_in1, w_in2, w_in3;
     wire w_r, w_i, w_s, w_b, w_u, w_j, w_ld, w_tkn;
     reg [31:0] r_pc = 0;
+    // 分岐成立時は後続命令を無効化し、ロード直後の依存時は停止する
     wire w_miss = P2_b & w_tkn & P2_v;
     wire w_lduse = P3_v & P3_ld & ((P3_rd==P2_rs1) | ((P3_rd==P2_rs2) & (P2_r | P2_b |P2_s)));
     reg [2:0] P2_func;
@@ -23,12 +25,12 @@ module m_proc9_F (
         if (!P4_s && !P4_b && P4_v && P4_rd == 5'd30)
             r_dout <= w_rt;
     end
-    //IF stage------------------------------------------
+    // IF: 次のPCを選び、命令を読み出す
     m_mux m0 (.w_in1 (w_npc), .w_in2 (P2_tpc), .w_s (w_miss), .w_out (w_pcin));
     m_adder m2 (.w_in1 (32'h4), .w_in2 (r_pc), .w_out (w_npc));
     m_am_imem m3 (.w_pc (r_pc), .w_insn (w_ir));
     //----------------------------------------------------
-    //ID stage--------------------------------------------
+    // ID: 命令を解読し、レジスタ値と即値を取り出す
     m_gen_imm m4 (.w_ir (P1_ir), .w_imm (w_imm), .w_r (w_r), .w_i (w_i), .w_s (w_s), .w_b (w_b), .w_u (w_u), 
                 .w_j (w_j), .w_ld (w_ld));
     m_RF2 m5 (.w_clk (w_clk), .w_ra1 (P1_ir[19:15]), .w_ra2 (P1_ir[24:20]), .w_rd1 (w_r1), .w_rd2 (w_r2), 
@@ -54,15 +56,15 @@ module m_proc9_F (
         {P4_alu, P4_ldd, P4_rd} <= {P3_alu, w_ldd, P3_rd};
     end
     //----------------------------------------------------
-    //EX stage--------------------------------------------
+    // EX: 演算と分岐条件の判定を行う
     m_alu m8 (.w_in1 (w_in1), .w_in2 (w_in2), .w_func (P2_func), .w_out (w_alu), .w_tkn (w_tkn));
-    //MA stage---------------------------------------------
+    // MA: データメモリを読み書きする
     m_am_dmem m9 (.w_clk (w_clk), .w_we (P3_s & P3_v), .w_adr (P3_alu), .w_wd (P3_in3), .w_rd (w_ldd));
     //-----------------------------------------------------
-    //WB stage---------------------------------------------
+    // WB: レジスタへ書き戻す演算結果またはロード値を選ぶ
     m_mux m10 (.w_in1 (P4_alu), .w_in2 (P4_ldd), .w_s (P4_ld), .w_out (w_rt));
     //-----------------------------------------------------
-    //フォワーディング--------------------------------------
+    // フォワーディング: 書き戻しを待たずに後続命令へ結果を渡す
     wire w_f3 = !P3_s & !P3_b & |P3_rd & P3_v;
     wire w_f4 = !P4_s & !P4_b & |P4_rd & P4_v;
     wire w_fwd1_P3 = (w_f3 & P3_rd==P2_rs1);

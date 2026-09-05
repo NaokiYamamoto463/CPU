@@ -7,6 +7,7 @@ module m_get_imm (
     input wire j,
     output wire [31:0] imm
 );
+// 命令形式ごとに即値を組み立てる（B/J形式の最下位ビットは0）
 assign imm  =   (i) ? {{20{ir[31]}}, ir[31:20]} : 
                 (s) ? {{20{ir[31]}}, ir[31:25], ir[11:7]} :
                 (b) ? {{20{ir[31]}}, ir[7], ir[30:25], ir[11:8], 1'b0} :

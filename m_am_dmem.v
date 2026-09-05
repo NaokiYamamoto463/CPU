@@ -5,8 +5,10 @@ module m_am_dmem (
     input wire [31:0] w_wd,
     output wire [31:0] w_rd
 );
+    // 64ワードのデータメモリ。アドレスの下位2ビットは使わない
     reg [31:0] mem [0:63];
     assign w_rd = mem[w_adr[7:2]];
+    // 読み出しは常時、書き込みはクロックの立ち上がりで行う
     always @(posedge w_clk) begin
         if (w_we) mem[w_adr[7:2]] <= w_wd;
     end

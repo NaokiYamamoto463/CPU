@@ -7,6 +7,7 @@ module m_get_type (
     output wire u,
     output wire j
 );
+    // オペコードの上位5ビットで命令形式を分類する
     assign j = (opcode5==5'b11011);
     assign b = (opcode5==5'b11000);
     assign s = (opcode5==5'b01000);
