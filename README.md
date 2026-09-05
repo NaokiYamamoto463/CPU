@@ -7,9 +7,114 @@ Verilog HDLで記述した、32ビットのパイプラインCPUです。RISC-V�
 - **5段パイプライン**：命令フェッチ（IF）、デコード（ID）、実行（EX）、メモリアクセス（MA）、書き戻し（WB）。
 - **レジスタファイル**：32ビット × 32本。`x0`の読み出し値は常に0です。
 - **命令メモリ・データメモリ**：それぞれ32ビット × 64ワード（256バイト）。
-- **ALU**：加算、減算、ビット単位のANDと、不一致による分岐条件の判定。
+- **ALU**：加算、減算、ビット単位のXOR・OR・ANDと、不一致による分岐条件の判定。
 - **ハザード対策**：演算結果のフォワーディング、ロード直後の依存命令に対するストール、分岐成立時の後続命令の無効化。
 - **結果の観測**：トップモジュールからVIOに32ビットのCPU出力を接続し、Nexys A7の16個のLEDに結果の下位16ビットを表示します。
+
+## 論理回路図
+
+ソースコードに対応する、主要モジュール単位の接続図です。P1〜P4は、IF・ID・EX・MA・WBの5段をつなぐパイプラインレジスタを表します。クロック配線や一部の制御信号は省略しています。
+
+### CPUのデータパス
+
+実線は主なデータの流れ、点線は制御信号とフォワーディングの経路です。図中のモジュールは`scr/m_proc9_F.v`で接続されています。
+
+```mermaid
+flowchart LR
+    subgraph IF_STAGE["IF：命令フェッチ"]
+        PC["PCレジスタ<br/>r_pc"]
+        IMEM["命令メモリ<br/>m_am_imem"]
+        P1["P1：IF/IDレジスタ<br/>命令・PC"]
+        PC --> IMEM --> P1
+        PC -->|r_pc| P1
+    end
+
+    subgraph ID_STAGE["ID：デコード"]
+        RF["レジスタファイル<br/>m_RF2"]
+        IMM["命令形式判定・即値生成<br/>m_gen_imm"]
+        SRC["入力2の選択<br/>m_mux m7"]
+        P2["P2：ID/EXレジスタ<br/>オペランド・制御信号"]
+        RF -->|w_r2| SRC
+        IMM -->|w_imm| SRC
+        IMM -.->|w_r / w_b| SRC
+        SRC -->|w_s2| P2
+        RF -->|w_r1 / w_r2| P2
+        IMM -.->|命令形式| P2
+    end
+
+    subgraph EX_STAGE["EX：実行"]
+        FWD["フォワーディング選択<br/>入力1・入力2・ストア値"]
+        ALU["ALU<br/>m_alu"]
+        P3["P3：EX/MAレジスタ<br/>演算結果・ストア値・制御信号"]
+        FWD -->|w_in1 / w_in2| ALU
+        ALU -->|w_alu| P3
+        FWD -->|w_in3：ストア値| P3
+    end
+
+    subgraph MA_STAGE["MA：メモリアクセス"]
+        DMEM["データメモリ<br/>m_am_dmem"]
+        P4["P4：MA/WBレジスタ<br/>演算結果・ロード値・制御信号"]
+        DMEM -->|w_ldd| P4
+    end
+
+    subgraph WB_STAGE["WB：書き戻し"]
+        WB["ALU結果 / ロード値の選択<br/>m_mux m10"]
+    end
+
+    P1 -->|P1_ir| RF
+    P1 -->|P1_ir| IMM
+    P2 -->|P2_r1 / P2_s2 / P2_r2| FWD
+    P2 -.->|P2_func| ALU
+    P3 -->|P3_alu：アドレス| DMEM
+    P3 -->|P3_in3：ストア値| DMEM
+    P3 -->|P3_alu| P4
+    P4 -->|P4_alu / P4_ldd| WB
+    P4 -.->|P4_ld| WB
+    WB -->|w_rt：書き戻しデータ| RF
+    P3 -.->|P3_alu| FWD
+    WB -.->|w_rt| FWD
+
+    classDef pipeline fill:#e8f0ff,stroke:#4067a8,color:#172b4d;
+    class P1,P2,P3,P4 pipeline;
+```
+
+ロード・ストアのアドレスはALUで計算します。ストア値は`w_in3`から`P3_in3`を経由してデータメモリへ渡します。フォワーディングは、対応する書き込み先レジスタが一致するときに有効になり、P3の演算結果をP4の書き戻しデータより優先します。
+
+### 分岐とパイプライン制御
+
+分岐先はID段で計算してP2に保存し、分岐するかどうかはEX段で判定します。
+
+```mermaid
+flowchart LR
+    PC["PCレジスタ<br/>r_pc"] --> ADD4["PC + 4<br/>m_adder m2"]
+    ADD4 -->|w_npc| NEXT["次のPCを選択<br/>m_mux m0"]
+    NEXT -->|w_pcin| PC
+
+    IDPC["P1_pc"] --> TARGET["分岐先の加算<br/>m_adder m6"]
+    IMM["即値 w_imm"] --> TARGET
+    TARGET -->|w_tpc| P2TPC["P2_tpcレジスタ"]
+    P2TPC --> NEXT
+
+    CMP["ALUの不一致判定<br/>w_tkn"] --> TAKEN["分岐成立<br/>w_miss = P2_b AND w_tkn AND P2_v"]
+    CTRL["P2_b：分岐命令<br/>P2_v：有効な命令"] --> TAKEN
+    TAKEN -.->|1なら分岐先を選択| NEXT
+    TAKEN -.-> FLUSH["後続命令を無効化<br/>次のP1_v・P2_vを0にする"]
+```
+
+`w_lduse`は、P3段のロード先レジスタとP2段で使うレジスタの依存を検出します。検出中はPC・P1とP2の命令情報を保持し、P2のオペランドを転送値に更新しながら、P3へ無効な命令（バブル）を送ります。コードでは、このストール中はPC更新とP1・P2の分岐無効化処理を保留します。
+
+### 計算結果からLEDまで
+
+`x30`への有効な書き戻しをCPUの出力に保存し、`scr/m_main.v`でLEDとVIOに接続します。
+
+```mermaid
+flowchart LR
+    WB["書き戻しデータ<br/>w_rt：32ビット"] --> DOUT["CPUの出力レジスタ<br/>r_dout"]
+    VALID["P4_vが1・P4_rdが30<br/>ストア命令でも分岐命令でもない"] -.->|保存を許可| DOUT
+    DOUT -->|w_rslt| RESULT["次のクロックで保存<br/>m_mainのr_rslt"]
+    RESULT -->|下位16ビット| LED["LED 15〜0"]
+    RESULT -->|32ビット| VIO["VIO<br/>vio_0.probe_in0"]
+```
 
 ## ファイル構成
 
