@@ -9,10 +9,10 @@ module m_gshare (
     reg [1:0] mem [0:31];
     reg [4:0] r_bhr = 0;
     always @(posedge w_clk) begin
-        if (w_we) r_bhr <= {w_tkn, r_hbr[4:1]};
+        if (w_we) r_bhr <= {w_tkn, r_bhr[4:1]};
     end
     assign w_pred = w_data[1];
-    wire [1:0] w_data = mem[w_wadr ^ r_hbr];
+    wire [1:0] w_data = mem[w_wadr ^ r_bhr];
     wire [1:0] w_cnt = mem[w_wadr ^ r_bhr];
     always @(posedge w_clk) begin
         mem[w_wadr ^ r_bhr] <= (w_cnt < 3 & w_tkn) ? w_cnt + 1 :
