@@ -14,8 +14,18 @@ module m_proc9_F (
     wire [31:0] w_alu, w_ldd, w_tpc, w_pcin, w_in1, w_in2, w_in3;
     wire w_r, w_i, w_s, w_b, w_u, w_j, w_ld, w_tkn;
     reg [31:0] r_pc = 0;
+    wire [31:0] w_ppc;
+    wire w_pred;
+    m_gshare m15 (.w_clk (w_clk), .w_radr (r_pc[6:2]), .w_pred (w_pred), .w_wadr (P2_pc[6:2]), 
+                .w_we (P2_v & P2_b), .w_tkn (w_tkn));
+    wire [64:0] w_btb_wd = {1'b1, P2_pc[31:7], P2_tpc};
+    wire w_hit;
+    m_btb m14 (.w_clk (w_clk), .w_pc (r_pc), .w_hit (w_hit), .w_dout (w_ppc), .w_wadr (P2_pc[6:2]), 
+            .w_we (P2_v & P2_b), .w_wd (w_btb_wd));
+    wire w_bp_tkn = w_pred & w_hit;
+    wire [31:0] w_truepc = (P2_v & P2_b & w_tkn) ? P2_tpc : P2_pc + 4;
     // 分岐成立時は後続命令を無効化し、ロード直後の依存時は停止する
-    wire w_miss = P2_b & w_tkn & P2_v;
+    wire w_miss = P2_v & P2_b & P1_v & (P1_pc != w_truepc);
     wire w_lduse = P3_v & P3_ld & ((P3_rd==P2_rs1) | ((P3_rd==P2_rs2) & (P2_r | P2_b |P2_s)));
     reg [2:0] P2_func;
     wire [2:0] w_func;
@@ -26,7 +36,7 @@ module m_proc9_F (
             r_dout <= w_rt;
     end
     // IF: 次のPCを選び、命令を読み出す
-    m_mux m0 (.w_in1 (w_npc), .w_in2 (P2_tpc), .w_s (w_miss), .w_out (w_pcin));
+    assign w_pcin = (w_miss) ? w_truepc : (w_bp_tkn) ? w_ppc : w_npc;
     m_adder m2 (.w_in1 (32'h4), .w_in2 (r_pc), .w_out (w_npc));
     m_am_imem m3 (.w_pc (r_pc), .w_insn (w_ir));
     //----------------------------------------------------
