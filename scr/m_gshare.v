@@ -15,8 +15,10 @@ module m_gshare (
     wire [1:0] w_data = mem[w_radr ^ r_bhr];
     wire [1:0] w_cnt = mem[w_wadr ^ r_bhr];
     always @(posedge w_clk) begin
-        mem[w_wadr ^ r_bhr] <= (w_cnt < 3 & w_tkn) ? w_cnt + 1 :
-                                (w_cnt > 0 & !w_tkn) ? w_cnt - 1 : w_cnt;
+        if (w_we) begin
+            mem[w_wadr ^ r_bhr] <= (w_cnt < 3 & w_tkn) ? w_cnt + 1 :
+                                    (w_cnt > 0 & !w_tkn) ? w_cnt - 1 : w_cnt;
+        end
     end
-    integer i; initial for (i=0; i<32: i=i+1) mem[i] = 1;
+    integer i; initial for (i=0; i<32; i=i+1) mem[i] = 1;
 endmodule

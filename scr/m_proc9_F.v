@@ -18,7 +18,7 @@ module m_proc9_F (
     wire w_pred;
     m_gshare m15 (.w_clk (w_clk), .w_radr (r_pc[6:2]), .w_pred (w_pred), .w_wadr (P2_pc[6:2]), 
                 .w_we (P2_v & P2_b), .w_tkn (w_tkn));
-    wire [64:0] w_btb_wd = {1'b1, P2_pc[31:7], P2_tpc};
+    wire [57:0] w_btb_wd = {1'b1, P2_pc[31:7], P2_tpc};
     wire w_hit;
     m_btb m14 (.w_clk (w_clk), .w_pc (r_pc), .w_hit (w_hit), .w_dout (w_ppc), .w_wadr (P2_pc[6:2]), 
             .w_we (P2_v & P2_b), .w_wd (w_btb_wd));
