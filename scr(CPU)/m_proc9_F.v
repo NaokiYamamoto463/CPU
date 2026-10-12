@@ -27,9 +27,38 @@ module m_proc9_F (
     // 分岐成立時は後続命令を無効化し、ロード直後の依存時は停止する
     wire w_miss = P2_v & P2_b & P1_v & (P1_pc != w_truepc);
     wire w_lduse = P3_v & P3_ld & ((P3_rd==P2_rs1) | ((P3_rd==P2_rs2) & (P2_r | P2_b |P2_s)));
-    reg [2:0] P2_func;
-    wire [2:0] w_func;
-    assign w_func = (w_ld | w_s) ? 3'b000 : P1_ir[14:12];
+    reg [3:0] P2_func;
+    wire [3:0] w_func;
+    // 命令の各フィールドを抽出
+    wire [6:0] w_opcode = P1_ir[6:0];
+    wire [2:0] w_funct3 = P1_ir[14:12];
+    wire [6:0] w_funct7 = P1_ir[31:25];
+    // 命令形式の判定
+    wire w_rtype = (w_opcode == 7'b0110011);
+    wire w_itype = (w_opcode == 7'b0010011);
+    // SUB
+    wire w_sub = w_rtype && (w_funct3 == 3'b000) && (w_funct7 == 7'b0100000);
+    // SRA 
+    wire w_sra = w_rtype && (w_funct3 == 3'b101) && (w_funct7 == 7'b0100000);
+    // SRAI 
+    wire w_srai = w_itype && (w_funct3 == 3'b101) && (w_funct7 == 7'b0100000);
+    // ALU制御
+    
+    // ========================================
+    // ALU制御信号生成
+    // ========================================
+    assign w_func = (w_ld | w_s) ? 4'b0000 : // Load / Store はアドレス加算
+                    w_b ?  ((w_funct3 == 3'b000) ? 4'b1001 : // BEQ
+                            (w_funct3 == 3'b001) ? 4'b1010 : // BNE
+                            (w_funct3 == 3'b100) ? 4'b1011 : // BLT
+                            (w_funct3 == 3'b101) ? 4'b1100 : // BGE
+                            (w_funct3 == 3'b110) ? 4'b1110 : // BLTU
+                            (w_funct3 == 3'b111) ? 4'b1111 : // BGEU
+                                                    4'b0000) :
+                    w_sub ? 4'b1000 : //sub
+                    (w_sra | w_srai) ? 4'b1101 : // SRA / SRAI
+                    {1'b0, w_funct3}; //その他の演算
+        
     always @(posedge w_clk) begin
         // 書き戻しデータw_rtと同じP4段でx30への書き込みを判定する。
         if (!P4_s && !P4_b && P4_v && P4_rd == 5'd30)
