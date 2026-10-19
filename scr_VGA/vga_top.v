@@ -12,29 +12,29 @@ module vga_top (
 
     // =====================================
     // Clocking Wizard
-    // 100MHz -> VGA 25MHz / CPU 60MHz
+    // 100MHz -> VGA 25MHz / CPU 50MHz
     // =====================================
     wire pix_clk25;
-    wire cpu_clk60;
+    wire cpu_clk50;
     wire locked;
 
     clk_wiz_0 u_clk (
         .clk_in1(CLK100MHZ),
         .clk_out1(pix_clk25),
-        .clk_out2(cpu_clk60),
+        .clk_out2(cpu_clk50),
         .reset(~CPU_RESETN),
         .locked(locked)
     );
 
     // =====================================
-    // CPUリセット（60MHzドメイン）
+    // CPUリセット（50MHzドメイン）
     // =====================================
     wire reset_req = ~CPU_RESETN | ~locked;
 
     (* ASYNC_REG = "TRUE" *)
     reg [1:0] cpu_reset_sync = 2'b11;
 
-    always @(posedge cpu_clk60 or posedge reset_req) begin
+    always @(posedge cpu_clk50 or posedge reset_req) begin
         if (reset_req)
             cpu_reset_sync <= 2'b11;
         else
@@ -65,10 +65,10 @@ module vga_top (
     wire [9:0] mmio_y;
 
     // =====================================
-    // RISC-V CPU（60MHz）
+    // RISC-V CPU（50MHz）
     // =====================================
     m_proc9_F u_cpu (
-        .w_clk(cpu_clk60),
+        .w_clk(cpu_clk50),
         .reset(reset),
         .r_dout(cpu_result),
 
@@ -80,10 +80,10 @@ module vga_top (
     );
 
     // =====================================
-    // VGA MMIO（60MHz）
+    // VGA MMIO（50MHz）
     // =====================================
     vga_mmio u_mmio (
-        .clk(cpu_clk60),
+        .clk(cpu_clk50),
         .reset(reset),
 
         .addr(mmio_addr),
@@ -125,8 +125,8 @@ module vga_top (
 
     // CPUのアクセス先が画面用メモリか判定
     wire fb_sel = (mmio_addr >= 32'h8100_0000) &&
-                    (mmio_addr <  32'h8112_C000) &&
-                    (mmio_addr[1:0] == 2'b00);
+                  (mmio_addr <  32'h8112_C000) &&
+                  (mmio_addr[1:0] == 2'b00);
 
     // 表示する画素番号 = Y × 640 + X
     wire [18:0] fb_pix_addr = y * 19'd640 + {9'd0, x};
@@ -136,7 +136,7 @@ module vga_top (
 
     vga_framebuffer u_fb (
         // CPU側
-        .cpu_clk(cpu_clk60),
+        .cpu_clk(cpu_clk50),
         .cpu_we(mmio_we && fb_sel),
         .cpu_re(1'b0),
         .cpu_addr(mmio_addr[20:2]),
@@ -148,6 +148,7 @@ module vga_top (
         .pix_addr(visible ? fb_pix_addr : 19'd0),
         .pix_data(fb_pix_data)
     );
+
     // =====================================
     // VGA出力
     // =====================================
